@@ -57,8 +57,8 @@ clean:
 
 # Compiles & runs the code on the DAS
 run: $(PROJ_BASE)/caesar $(PROJ_BASE)/checksum
-	prun -v -np 1 -native "-C TitanX --gres=gpu:1" $(PROJ_BASE)/caesar $(RUNARGS_CAESAR)
-	prun -v -np 1 -native "-C TitanX --gres=gpu:1" $(PROJ_BASE)/checksum $(RUNARGS_CHECKSUM)
+	prun -v -np 1 -native "-C TitanX" $(PROJ_BASE)/caesar $(RUNARGS_CAESAR)
+	prun -v -np 1 -native "-C TitanX" $(PROJ_BASE)/checksum $(RUNARGS_CHECKSUM)
 # Compiles & runs the code on a local, CUDA-supported machine
 runlocal: $(PROJ_BASE)/caesar $(PROJ_BASE)/checksum
 	$(PROJ_BASE)/caesar $(RUNARGS_CAESAR)

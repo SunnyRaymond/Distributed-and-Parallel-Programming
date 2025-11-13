@@ -14,6 +14,8 @@
 #include "timer.hh"
 #include "file.hh"
 
+#include <cuda_runtime.h>
+
 using namespace std;
 
 
@@ -39,26 +41,35 @@ static void checkCudaCall(cudaError_t result) {
 /* Change this kernel to compute a simple, additive checksum of the given data.
  * The result should be written to the given result-integer, which is an
  * integer and NOT an array like deviceDataIn. */
- __global__ void checksumKernel(unsigned int* result, unsigned int *deviceDataIn){
+__global__ void checksumKernel(unsigned int* result,
+                               const unsigned int *deviceDataIn,
+                               int n) {
 
-    // YOUR CODE HERE
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= n) return;
 
+    // Simple additive checksum with atomic accumulation
+    unsigned int val = deviceDataIn[idx];
+    atomicAdd(result, val);
 }
 
 /* Wrapper for your checksum kernel, i.e., does the necessary preparations and
  * calls your kernel. */
 unsigned int checksumSeq (int n, unsigned int* data_in) {
     int i;
+    unsigned int checksum = 0;
     timer sequentialTime = timer("Sequential checksum");
 
     sequentialTime.start();
-    for (i=0; i<n; i++) {}
+    for (i = 0; i < n; i++) {
+        checksum += data_in[i];
+    }
     sequentialTime.stop();
 
     cout << fixed << setprecision(6);
     cout << "Checksum (sequential): \t\t" << sequentialTime.getElapsed() << " seconds." << endl;
 
-    return 0;
+    return checksum;
 }
 
 /**
@@ -66,8 +77,12 @@ unsigned int checksumSeq (int n, unsigned int* data_in) {
  * the checksum kernel. It also computes the missing values not calculated
  * on the GPU. It then adds all values together and prints the checksum
  */
- unsigned int checksumCuda (int n, unsigned int* data_in) {
+unsigned int checksumCuda (int n, unsigned int* data_in) {
     int threadBlockSize = 512;
+
+    if (n <= 0) {
+        return 0;
+    }
 
     // Allocate the vectors & the result int on the GPU
     unsigned int* deviceDataIn = NULL;
@@ -83,6 +98,9 @@ unsigned int checksumSeq (int n, unsigned int* data_in) {
         exit(1);
     }
 
+    // Initialize result to 0 on device
+    checkCudaCall(cudaMemset(deviceResult, 0, sizeof(unsigned int)));
+
     timer kernelTime  = timer("kernelTime");
     timer memoryTime = timer("memoryTime");
 
@@ -91,8 +109,11 @@ unsigned int checksumSeq (int n, unsigned int* data_in) {
     checkCudaCall(cudaMemcpy(deviceDataIn, data_in, n*sizeof(unsigned int), cudaMemcpyHostToDevice));
     memoryTime.stop();
 
+    // Configure grid
+    int gridSize = (n + threadBlockSize - 1) / threadBlockSize;
+
     kernelTime.start();
-    checksumKernel<<<n/threadBlockSize, threadBlockSize>>>(deviceResult, deviceDataIn);
+    checksumKernel<<<gridSize, threadBlockSize>>>(deviceResult, deviceDataIn, n);
     cudaDeviceSynchronize();
     kernelTime.stop();
 

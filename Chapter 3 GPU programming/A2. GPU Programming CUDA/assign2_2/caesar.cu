@@ -15,6 +15,8 @@
 #include "file.hh"
 #include "timer.hh"
 
+#include <cuda_runtime.h>
+
 using namespace std;
 
 
@@ -39,18 +41,32 @@ static void checkCudaCall(cudaError_t result) {
 
 /* Change this kernel to properly encrypt the given data. The result should be
  * written to the given out data. */
-__global__ void encryptKernel(char* deviceDataIn, char* deviceDataOut) {
+__global__ void encryptKernel(char* deviceDataIn, char* deviceDataOut,
+                              int n, int key_length, const int *key) {
 
-    // YOUR CODE HERE
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= n) return;
 
+    // Shift cipher: c[i] = (byte)(p[i] + key[i mod key_length])
+    int k = key[idx % key_length];
+    unsigned char in = static_cast<unsigned char>(deviceDataIn[idx]);
+    unsigned char out = static_cast<unsigned char>(in + k); // wraps mod 256
+    deviceDataOut[idx] = static_cast<char>(out);
 }
 
 /* Change this kernel to properly decrypt the given data. The result should be
  * written to the given out data. */
-__global__ void decryptKernel(char* deviceDataIn, char* deviceDataOut) {
+__global__ void decryptKernel(char* deviceDataIn, char* deviceDataOut,
+                              int n, int key_length, const int *key) {
 
-    // YOUR CODE HERE
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= n) return;
 
+    // Inverse shift: p[i] = (byte)(c[i] - key[i mod key_length])
+    int k = key[idx % key_length];
+    unsigned char in = static_cast<unsigned char>(deviceDataIn[idx]);
+    unsigned char out = static_cast<unsigned char>(in - k); // wraps mod 256
+    deviceDataOut[idx] = static_cast<char>(out);
 }
 
 /* Sequential implementation of encryption with the Shift cipher (and therefore
@@ -63,9 +79,13 @@ int EncryptSeq (int n, char* data_in, char* data_out, int key_length, int *key)
   timer sequentialTime = timer("Sequential encryption");
 
   sequentialTime.start();
-  for (i=0; i<n; i++) {
+  for (i = 0; i < n; i++) {
 
     // YOUR CODE HERE
+    int k = key[i % key_length];
+    unsigned char in = static_cast<unsigned char>(data_in[i]);
+    unsigned char out = static_cast<unsigned char>(in + k); // modulo-256
+    data_out[i] = static_cast<char>(out);
 
   }
   sequentialTime.stop();
@@ -86,9 +106,13 @@ int DecryptSeq (int n, char* data_in, char* data_out, int key_length, int *key)
   timer sequentialTime = timer("Sequential decryption");
 
   sequentialTime.start();
-  for (i=0; i<n; i++) {
+  for (i = 0; i < n; i++) {
 
     // YOUR CODE HERE
+    int k = key[i % key_length];
+    unsigned char in = static_cast<unsigned char>(data_in[i]);
+    unsigned char out = static_cast<unsigned char>(in - k); // modulo-256
+    data_out[i] = static_cast<char>(out);
 
   }
   sequentialTime.stop();
@@ -104,6 +128,10 @@ int DecryptSeq (int n, char* data_in, char* data_out, int key_length, int *key)
 int EncryptCuda (int n, char* data_in, char* data_out, int key_length, int *key) {
     int threadBlockSize = 512;
 
+    if (n <= 0) {
+        return 0;
+    }
+
     // allocate the vectors on the GPU
     char* deviceDataIn = NULL;
     checkCudaCall(cudaMalloc((void **) &deviceDataIn, n * sizeof(char)));
@@ -119,6 +147,18 @@ int EncryptCuda (int n, char* data_in, char* data_out, int key_length, int *key)
         return -1;
     }
 
+    // copy key to device
+    int *deviceKey = NULL;
+    checkCudaCall(cudaMalloc((void **)&deviceKey, key_length * sizeof(int)));
+    if (deviceKey == NULL) {
+        checkCudaCall(cudaFree(deviceDataIn));
+        checkCudaCall(cudaFree(deviceDataOut));
+        cout << "could not allocate key memory!" << endl;
+        return -1;
+    }
+    checkCudaCall(cudaMemcpy(deviceKey, key, key_length * sizeof(int),
+                             cudaMemcpyHostToDevice));
+
     timer kernelTime1 = timer("kernelTime");
     timer memoryTime = timer("memoryTime");
 
@@ -128,8 +168,11 @@ int EncryptCuda (int n, char* data_in, char* data_out, int key_length, int *key)
     memoryTime.stop();
 
     // execute kernel
+    int gridSize = (n + threadBlockSize - 1) / threadBlockSize;
+
     kernelTime1.start();
-    encryptKernel<<<n/threadBlockSize, threadBlockSize>>>(deviceDataIn, deviceDataOut);
+    encryptKernel<<<gridSize, threadBlockSize>>>(deviceDataIn, deviceDataOut,
+                                                 n, key_length, deviceKey);
     cudaDeviceSynchronize();
     kernelTime1.stop();
 
@@ -143,6 +186,7 @@ int EncryptCuda (int n, char* data_in, char* data_out, int key_length, int *key)
 
     checkCudaCall(cudaFree(deviceDataIn));
     checkCudaCall(cudaFree(deviceDataOut));
+    checkCudaCall(cudaFree(deviceKey));
 
     cout << fixed << setprecision(6);
     cout << "Encrypt (kernel): \t\t" << kernelTime1.getElapsed() << " seconds." << endl;
@@ -156,6 +200,10 @@ int EncryptCuda (int n, char* data_in, char* data_out, int key_length, int *key)
 int DecryptCuda (int n, char* data_in, char* data_out, int key_length, int *key) {
     int threadBlockSize = 512;
 
+    if (n <= 0) {
+        return 0;
+    }
+
     // allocate the vectors on the GPU
     char* deviceDataIn = NULL;
     checkCudaCall(cudaMalloc((void **) &deviceDataIn, n * sizeof(char)));
@@ -171,6 +219,18 @@ int DecryptCuda (int n, char* data_in, char* data_out, int key_length, int *key)
         return -1;
     }
 
+    // copy key to device
+    int *deviceKey = NULL;
+    checkCudaCall(cudaMalloc((void **)&deviceKey, key_length * sizeof(int)));
+    if (deviceKey == NULL) {
+        checkCudaCall(cudaFree(deviceDataIn));
+        checkCudaCall(cudaFree(deviceDataOut));
+        cout << "could not allocate key memory!" << endl;
+        return -1;
+    }
+    checkCudaCall(cudaMemcpy(deviceKey, key, key_length * sizeof(int),
+                             cudaMemcpyHostToDevice));
+
     timer kernelTime1 = timer("kernelTime");
     timer memoryTime = timer("memoryTime");
 
@@ -180,8 +240,11 @@ int DecryptCuda (int n, char* data_in, char* data_out, int key_length, int *key)
     memoryTime.stop();
 
     // execute kernel
+    int gridSize = (n + threadBlockSize - 1) / threadBlockSize;
+
     kernelTime1.start();
-    decryptKernel<<<n/threadBlockSize, threadBlockSize>>>(deviceDataIn, deviceDataOut);
+    decryptKernel<<<gridSize, threadBlockSize>>>(deviceDataIn, deviceDataOut,
+                                                 n, key_length, deviceKey);
     cudaDeviceSynchronize();
     kernelTime1.stop();
 
@@ -195,6 +258,7 @@ int DecryptCuda (int n, char* data_in, char* data_out, int key_length, int *key)
 
     checkCudaCall(cudaFree(deviceDataIn));
     checkCudaCall(cudaFree(deviceDataOut));
+    checkCudaCall(cudaFree(deviceKey));
 
     cout << fixed << setprecision(6);
     cout << "Decrypt (kernel): \t\t" << kernelTime1.getElapsed() << " seconds." << endl;
