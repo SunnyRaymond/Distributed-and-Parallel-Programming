@@ -1,4 +1,0 @@
-set terminal png
-set output "plot.png"
-
-plot 'result.txt' with lines notitle

@@ -1,0 +1,43 @@
+ASSIGNMENT 2.1 FRAMEWORK - README
+    Distributed and Parallel Programming 2022
+
+In this folder, you can find the framework for the first sub-assignment of
+assignment 2. You are supposed to parallelize the wave equation simulation
+again, this time using CUDA to parallelize it on the GPU.
+
+Your can write your code in simulate.cu, but please do not change any of the
+other files for grading purposes. If you want to add extra files that need
+extra compilation, that is allowed, but please change the Makefile and hand it
+in, and be sure to note in your report that you did. Additionally, by default,
+the framework runs on a GTX Titan X on the DAS5, which has compute capability
+5.2. If you want to use another GPU, or want to run locally on another GPU,
+please change the COMPUTE variable in the Makefile to match the correct compute
+capability (this should be the version minus the dot - so for the Titan X, this
+becomes '52'). Alternatively, if you append 'COMPUTE=X' to your make command,
+then the compute capability is set to value X for one run only. Note that you
+may have to rebuild from scratch for it to work, i.e., run 'make clean' first.
+
+To make the assignment, use:
+    make
+or
+    make assign2_1
+
+If you want to build the vector-add example, use:
+    make vector-add
+
+To run the assignment locally with a few test parameters (check 'RUNARGS' in
+the Makefile), use:
+    make runlocal
+or, for the DAS5:
+    make run
+
+Like in the previous assignments, you can show a plot of the last run using:
+    make plot
+
+Finally, if you run into weird behaviour or it seems like your changes have no
+effect, try building from scratch by first removing all compiled files and
+results:
+    make clean
+It is good practise to always run 'make clean' before you hand in your
+assignment, to avoid handing in machine-specific compiled files and files that
+will be overwritten when your code runs anyway.
