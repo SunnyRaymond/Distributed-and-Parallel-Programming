@@ -47,7 +47,7 @@ Expected:
 Request an interactive GPU session:
 
 ```bash
-srun -p fatq --gres=gpu:1 --constraint=TitanRTX --pty bash
+srun -p fatq --gres=gpu:1 --constraint=TitanRTX --pty bash -l
 ```
 
 Explanation:
