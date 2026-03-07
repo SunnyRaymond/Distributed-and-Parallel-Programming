@@ -108,7 +108,7 @@ Example:
 
 ---
 
-# 6. Enable Conda Environment
+# 6. Enable Environment
 
 Initialize conda:
 
@@ -126,6 +126,12 @@ Example:
 
 ```bash
 conda activate cs224n_dfp
+```
+
+Change uv cache dir:
+
+```bash
+export XDG_CACHE_HOME=/var/scratch/dpp2567/.cache
 ```
 
 ---
