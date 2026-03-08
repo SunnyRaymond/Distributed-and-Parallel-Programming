@@ -161,6 +161,15 @@ submit jobs via  `sbatch`, moniter via:
 ```bash
 tail -f log/train_bpe_both_924xx.log
 ```
+and for model training:
+```bash
+tail -f log/train_lm_tinystories_925xx.log
+```
+
+to get into the node to see gpu usage:
+```bash
+srun --jobid=925xx --pty bash -l
+```
 
 # Typical Workflow
 
