@@ -159,7 +159,7 @@ exit
 ---
 submit jobs via  `sbatch`, moniter via:
 ```bash
-tail -f log/train_bpe_both_92xxx.out
+tail -f log/train_bpe_both_924xx.log
 ```
 
 # Typical Workflow
