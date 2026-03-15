@@ -113,6 +113,7 @@ Example:
 Initialize conda and change uv package location:
 
 ```bash
+source ~/.bashrc
 source /var/scratch/dpp2567/miniconda3/etc/profile.d/conda.sh
 export UV_CACHE_DIR=/var/scratch/dpp2567/.uv_cache
 export XDG_CACHE_HOME=/var/scratch/dpp2567/.cache
